@@ -18,36 +18,52 @@ jobs:
       with:
         java-version: '17'
         distribution: 'temurin'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v2
+
+    - name: Accept Android licenses
+      run: |
+        yes | sdkmanager --licenses || true
 
     - name: Get current date
       id: date
       run: echo "date=$(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
 
+    - name: Debug file structure
+      run: ls -laR
+      
     - name: Grant execute permission for gradlew
       run: chmod +x gradlew
 
     - name: Build Release APK
-      run: ./gradlew assembleRelease
+      run: ./gradlew assembleRelease --stacktrace
+
+    - name: Prepare APKs
+      run: |
+        mkdir -p apk-artifacts
+        find . -name '*.apk' -exec cp {} apk-artifacts/ \;
+        ls -la apk-artifacts
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: AutoTapApp
-        path: app/build/outputs/apk/release/app-release.apk
-        retention-days: 7
+        path: apk-artifacts/*.apk
+        retention-days: 1
 
     - name: Create Release
-      id: create_release
       uses: softprops/action-gh-release@v2
       with:
-        tag_name: v1.0.0
-        name: AutoTapApp Release
+        tag_name: auto-release-${{ github.run_id }}
+        name: AutoTapApp Release ${{ github.run_number }}
         body: |
           APK for AutoTap Accessibility Service
           - 自动点击"立即开始"按钮
           - 构建时间: ${{ steps.date.outputs.date }}
+          - 触发提交: ${{ github.sha }}
         draft: false
         prerelease: false
-        files: app/build/outputs/apk/release/app-release.apk
+        files: apk-artifacts/*.apk
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
